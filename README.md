@@ -1,5 +1,5 @@
 # Rust Synthetic Price Generator
-This Rust project generates synthetic financial market data (OHLC format) using Geometric Brownian Motion (GBM) and visualizes it as an interactive candlestick chart. The simulation includes intra-period price movements and produces professional-quality visualizations using Plotly.
+This Rust project generates synthetic financial market data (OHLC format) using Geometric Brownian Motion (GBM) and visualizes it as an interactive candlestick chart using Plotly.
 
 ![analytics](https://github.com/user-attachments/assets/357e434e-8175-47f7-b79e-20efe107aaf8)
 
