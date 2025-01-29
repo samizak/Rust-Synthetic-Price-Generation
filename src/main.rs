@@ -69,23 +69,17 @@ fn generate_intra_prices(
 // Main Visualization
 // ---------------------
 fn main() {
-    let mut params = Params {
+    let params = Params {
         n_periods: 252 * 5,
         start_price: 100.0,
-        mu: 0.1,
-        sigma: 0.05,
+        mu: 0.01,
+        sigma: 0.15,
         n_intra_steps: 100,
     };
 
-    // let mut current_df = generate_new_ohlc(&params);
-    let current_scale = "linear".to_string();
-
-    params.mu = 0.02;
-    params.sigma = 0.15;
-    params.n_intra_steps = 150;
     let current_df = generate_new_ohlc(&params);
 
-    redraw_plot(&current_df, &current_scale);
+    redraw_plot(&current_df);
 }
 
 fn generate_new_ohlc(params: &Params) -> Vec<(NaiveDate, f64, f64, f64, f64)> {
@@ -96,7 +90,7 @@ fn generate_new_ohlc(params: &Params) -> Vec<(NaiveDate, f64, f64, f64, f64)> {
         params.n_periods,
     );
 
-    println!("{:?}", close_prices);
+    // println!("{:?}", close_prices);
 
     let date_range: Vec<NaiveDate> = (0..params.n_periods)
         .map(|i| {
@@ -124,7 +118,7 @@ fn generate_new_ohlc(params: &Params) -> Vec<(NaiveDate, f64, f64, f64, f64)> {
     df
 }
 
-fn redraw_plot(current_df: &[(NaiveDate, f64, f64, f64, f64)], scale: &str) {
+fn redraw_plot(current_df: &[(NaiveDate, f64, f64, f64, f64)]) {
     // Create a new Plot object to clear previous traces
     let mut plot = Plot::new();
 
