@@ -1,5 +1,6 @@
 use chrono::{Duration, NaiveDate};
 use plotly::{Candlestick, Plot};
+use polars::prelude::*;
 use rand::prelude::*;
 use rand_distr::{Normal, StandardNormal};
 use std::fs;
@@ -18,10 +19,10 @@ fn generate_gbm(start_price: f64, mu: f64, sigma: f64, n_periods: usize) -> Vec<
         let shock = sigma * dt.sqrt() * rng.sample::<f64, _>(StandardNormal);
         prices[t] = prices[t - 1] * (drift + shock).exp();
     }
-    return prices;
+    prices
 }
 
-fn get_normal_distribution(sigma: f64, n_steps: usize) -> Vec<f64> {
+fn test(sigma: f64, n_steps: usize) -> Vec<f64> {
     let mut rng = rand::rng();
     let normal = Normal::new(0.0, sigma / (n_steps as f64).sqrt()).unwrap();
     (0..n_steps - 1).map(|_| normal.sample(&mut rng)).collect()
@@ -37,7 +38,7 @@ fn generate_intra_prices(
         return vec![open_price, close_price];
     }
 
-    let returns = get_normal_distribution(sigma, n_steps);
+    let returns = test(sigma, n_steps);
     let mut prices = vec![open_price];
     let mut current_price = open_price;
 
@@ -76,7 +77,7 @@ fn main() {
     redraw_plot(&current_df);
 }
 
-fn generate_new_ohlc(params: &Params) -> Vec<(NaiveDate, f64, f64, f64, f64)> {
+fn generate_new_ohlc(params: &Params) -> DataFrame {
     let close_prices = generate_gbm(
         params.start_price,
         params.mu,
@@ -93,38 +94,92 @@ fn generate_new_ohlc(params: &Params) -> Vec<(NaiveDate, f64, f64, f64, f64)> {
         .rev()
         .collect();
 
-    let mut df = Vec::new();
-    let mut prev_close = params.start_price;
+    // Convert dates to days since epoch (1970-01-01)
+    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+    let dates_as_days: Vec<i32> = date_range
+        .iter()
+        .map(|d| d.signed_duration_since(epoch).num_days() as i32)
+        .collect();
 
-    for (date, close) in date_range.iter().zip(close_prices.iter()) {
+    let mut opens = Vec::with_capacity(params.n_periods);
+    let mut highs = Vec::with_capacity(params.n_periods);
+    let mut lows = Vec::with_capacity(params.n_periods);
+    let mut closes = Vec::with_capacity(params.n_periods);
+
+    let mut prev_close = params.start_price;
+    for (_, close) in date_range.iter().zip(close_prices.iter()) {
         let open = prev_close;
         let intra_prices = generate_intra_prices(open, *close, params.n_intra_steps, params.sigma);
         let high = intra_prices.iter().cloned().fold(f64::MIN, f64::max);
         let low = intra_prices.iter().cloned().fold(f64::MAX, f64::min);
 
-        df.push((*date, open, high, low, *close));
+        opens.push(open);
+        highs.push(high);
+        lows.push(low);
+        closes.push(*close);
         prev_close = *close;
     }
-    df
+
+    DataFrame::new(vec![
+        Series::new("date".into(), dates_as_days)
+            .cast(&DataType::Date)
+            .unwrap()
+            .into(), // Convert to Column
+        Series::new("open".into(), opens).into(),
+        Series::new("high".into(), highs).into(),
+        Series::new("low".into(), lows).into(),
+        Series::new("close".into(), closes).into(),
+    ])
+    .unwrap()
 }
 
-fn redraw_plot(current_df: &[(NaiveDate, f64, f64, f64, f64)]) {
+fn redraw_plot(current_df: &DataFrame) {
     let mut plot = Plot::new();
 
-    // Extract dates
-    let dates: Vec<String> = current_df
-        .iter()
-        .map(|(date, _, _, _, _)| date.format("%Y-%m-%d").to_string())
+    // Convert dates back from days since epoch
+    let epoch = NaiveDate::from_ymd_opt(1970, 1, 1).unwrap();
+    let date_series = current_df.column("date").unwrap().date().unwrap();
+    let dates: Vec<String> = date_series
+        .into_iter()
+        .map(|d| {
+            epoch
+                .checked_add_signed(Duration::days(d.unwrap() as i64))
+                .unwrap()
+                .format("%Y-%m-%d")
+                .to_string()
+        })
         .collect();
 
-    // Extract OHLC values
-    let opens: Vec<f64> = current_df.iter().map(|(_, o, _, _, _)| *o).collect();
-    let highs: Vec<f64> = current_df.iter().map(|(_, _, h, _, _)| *h).collect();
-    let lows: Vec<f64> = current_df.iter().map(|(_, _, _, l, _)| *l).collect();
-    let closes: Vec<f64> = current_df.iter().map(|(_, _, _, _, c)| *c).collect();
+    let opens: Vec<f64> = current_df
+        .column("open")
+        .unwrap()
+        .f64()
+        .unwrap()
+        .into_no_null_iter()
+        .collect();
+    let highs: Vec<f64> = current_df
+        .column("high")
+        .unwrap()
+        .f64()
+        .unwrap()
+        .into_no_null_iter()
+        .collect();
+    let lows: Vec<f64> = current_df
+        .column("low")
+        .unwrap()
+        .f64()
+        .unwrap()
+        .into_no_null_iter()
+        .collect();
+    let closes: Vec<f64> = current_df
+        .column("close")
+        .unwrap()
+        .f64()
+        .unwrap()
+        .into_no_null_iter()
+        .collect();
 
     let trace = Candlestick::new(dates, opens, highs, lows, closes).name("OHLC");
-
     plot.add_trace(Box::new(trace));
 
     let html_snippet = plot.to_inline_html(Some("my-plot-id"));
