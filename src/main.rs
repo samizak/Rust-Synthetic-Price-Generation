@@ -1,13 +1,8 @@
-use std::fs::{self, File};
-use std::io::Write;
-
-use chrono::NaiveDate;
-use plotly::layout::AxisType;
-use plotly::{Plot, Scatter};
+use chrono::{Duration, NaiveDate};
+use plotly::{Candlestick, Plot};
 use rand::prelude::*;
-use rand::Rng;
-use rand_distr::Normal;
-use rand_distr::StandardNormal;
+use rand_distr::{Normal, StandardNormal};
+use std::fs;
 
 // --------------------------
 // Data Generation Functions
@@ -26,7 +21,7 @@ fn generate_gbm(start_price: f64, mu: f64, sigma: f64, n_periods: usize) -> Vec<
     return prices;
 }
 
-fn test(sigma: f64, n_steps: usize) -> Vec<f64> {
+fn get_normal_distribution(sigma: f64, n_steps: usize) -> Vec<f64> {
     let mut rng = rand::rng();
     let normal = Normal::new(0.0, sigma / (n_steps as f64).sqrt()).unwrap();
     (0..n_steps - 1).map(|_| normal.sample(&mut rng)).collect()
@@ -42,7 +37,7 @@ fn generate_intra_prices(
         return vec![open_price, close_price];
     }
 
-    let returns = test(sigma, n_steps);
+    let returns = get_normal_distribution(sigma, n_steps);
     let mut prices = vec![open_price];
     let mut current_price = open_price;
 
@@ -72,13 +67,12 @@ fn main() {
     let params = Params {
         n_periods: 252 * 5,
         start_price: 100.0,
-        mu: 0.01,
-        sigma: 0.15,
-        n_intra_steps: 100,
+        mu: 0.005,
+        sigma: 0.08,
+        n_intra_steps: 500,
     };
 
     let current_df = generate_new_ohlc(&params);
-
     redraw_plot(&current_df);
 }
 
@@ -90,15 +84,11 @@ fn generate_new_ohlc(params: &Params) -> Vec<(NaiveDate, f64, f64, f64, f64)> {
         params.n_periods,
     );
 
-    // println!("{:?}", close_prices);
-
     let date_range: Vec<NaiveDate> = (0..params.n_periods)
         .map(|i| {
-            let mut date = NaiveDate::from_ymd(2024, 12, 31);
-            for _ in 0..i {
-                date = date.pred_opt().unwrap();
-            }
-            date
+            let date = NaiveDate::from_ymd_opt(2024, 12, 31).expect("Invalid initial date");
+            date.checked_sub_signed(Duration::days(i as i64))
+                .expect("Date out of range")
         })
         .rev()
         .collect();
@@ -119,23 +109,23 @@ fn generate_new_ohlc(params: &Params) -> Vec<(NaiveDate, f64, f64, f64, f64)> {
 }
 
 fn redraw_plot(current_df: &[(NaiveDate, f64, f64, f64, f64)]) {
-    // Create a new Plot object to clear previous traces
     let mut plot = Plot::new();
 
+    // Extract dates
     let dates: Vec<String> = current_df
         .iter()
         .map(|(date, _, _, _, _)| date.format("%Y-%m-%d").to_string())
         .collect();
-    let closes: Vec<f64> = current_df
-        .iter()
-        .map(|(_, _, _, _, close)| *close)
-        .collect();
 
-    let trace = Scatter::new(dates.clone(), closes)
-        .mode(plotly::common::Mode::Lines)
-        .name("Close Price");
+    // Extract OHLC values
+    let opens: Vec<f64> = current_df.iter().map(|(_, o, _, _, _)| *o).collect();
+    let highs: Vec<f64> = current_df.iter().map(|(_, _, h, _, _)| *h).collect();
+    let lows: Vec<f64> = current_df.iter().map(|(_, _, _, l, _)| *l).collect();
+    let closes: Vec<f64> = current_df.iter().map(|(_, _, _, _, c)| *c).collect();
 
-    plot.add_trace(trace);
+    let trace = Candlestick::new(dates, opens, highs, lows, closes).name("OHLC");
+
+    plot.add_trace(Box::new(trace));
 
     let html_snippet = plot.to_inline_html(Some("my-plot-id"));
     let template = fs::read_to_string("template.html").expect("Failed to read template.html");
