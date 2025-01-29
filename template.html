@@ -236,6 +236,19 @@
         transform: translateX(4px);
       }
 
+      /* Add to the existing CSS */
+      .plotly .range-slider {
+        background: var(--card-background) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: var(--border-radius) !important;
+        padding: 10px !important;
+        margin-top: 20px !important;
+      }
+
+      .plotly .range-slider-axis {
+        color: var(--text-color) !important;
+      }
+
       @keyframes slideIn {
         from {
           opacity: 0;
@@ -306,11 +319,8 @@
                 <div class="indicator-item" onclick="addIndicator('rsi')">
                   RSI (14)
                 </div>
-                <div class="indicator-item" onclick="addIndicator('macd')">
-                  MACD
-                </div>
                 <div class="indicator-item" onclick="addIndicator('bollinger')">
-                  Bollinger Bands
+                  Bollinger Bands (20)
                 </div>
               </div>
             </div>
@@ -326,19 +336,20 @@
         <p>
           Powered by Rust + Plotly • Generated at <span id="timestamp"></span>
         </p>
-        <p style="margin-top: 0.5rem; opacity: 0.7">
-          Toggle scale type for detailed analysis
-        </p>
       </footer>
     </div>
 
     <script>
+      const layout = {
+        title: "Synthetic Price Chart",
+        showlegend: true,
+      };
+
       // Constants
       const INDICATOR_COLORS = {
         rsi: "#FFA500",
         sma: "#FF6B6B",
         ema: "#4ECDC4",
-        macdLine: "#26a69a",
         signalLine: "#ff6d00",
         histogram: "#7e57c2",
       };
@@ -355,14 +366,48 @@
         return sma;
       }
 
+      function toggleLogScale() {
+        const btn = document.getElementById("logScaleBtn");
+        isLogScale = !isLogScale;
+
+        // Update button state
+        btn.classList.toggle("active", isLogScale);
+        btn.querySelector("span").textContent = isLogScale
+          ? "Linear Scale"
+          : "Log Scale";
+
+        // Animate icon
+        btn.querySelector("svg").style.transform = `rotate(${
+          isLogScale ? "180deg" : "0deg"
+        })`;
+
+        // Update plot with range slider preservation
+        // Plotly.relayout("my-plot-id", {
+        //   "yaxis.type": isLogScale ? "log" : "linear",
+        //   "yaxis.title": "Price",
+        //   "xaxis.title": "Date",
+        //   "xaxis.rangeslider.visible": true,
+        //   "xaxis.rangeslider.thickness": 0.1,
+        //   "xaxis.rangeslider.bgcolor": "rgba(255,255,255,0.1)",
+        // });
+
+        // Add visual feedback
+        animateScaleChange();
+      }
+
       function calculateEMA(data, period = 20) {
+        if (data.length < period) return [];
         const ema = [];
         const multiplier = 2 / (period + 1);
-        let emaValue =
-          data.slice(0, period).reduce((a, b) => a + b.y, 0) / period;
-
+        // Calculate SMA as the initial EMA value
+        const sma =
+          data.slice(0, period).reduce((sum, d) => sum + d.y, 0) / period;
+        ema.push({ x: data[period - 1].x, y: sma });
+        // Calculate subsequent EMA values
         for (let i = period; i < data.length; i++) {
-          emaValue = (data[i].y - emaValue) * multiplier + emaValue;
+          const emaValue =
+            (data[i].y - ema[ema.length - 1].y) * multiplier +
+            ema[ema.length - 1].y;
           ema.push({ x: data[i].x, y: emaValue });
         }
         return ema;
@@ -395,47 +440,6 @@
           rsi.push({ x: data[i].x, y: 100 - 100 / (1 + rs) });
         }
         return rsi;
-      }
-
-      // Separate the calculateMACD function from RSI
-      function calculateMACD(
-        data,
-        fastPeriod = 12,
-        slowPeriod = 26,
-        signalPeriod = 9
-      ) {
-        if (data.length < slowPeriod || data.length < fastPeriod) {
-          return { macdLine: [], signalLine: [], histogram: [] };
-        }
-
-        console.log(123456789);
-
-        const fastEMA = calculateEMA(data, fastPeriod);
-        const slowEMA = calculateEMA(data, slowPeriod);
-
-        // Align EMA arrays by start date
-        const startIndex = Math.max(fastEMA[0].x, slowEMA[0].x);
-        const alignedFast = fastEMA.filter((e) => e.x >= startIndex);
-        const alignedSlow = slowEMA.filter((e) => e.x >= startIndex);
-
-        const macdLine = alignedFast.map((v, i) => ({
-          x: v.x,
-          y: v.y - alignedSlow[i].y,
-        }));
-
-        const signalLine = calculateEMA(macdLine, signalPeriod);
-        const histogram = macdLine.slice(signalPeriod - 1).map((v, i) => ({
-          x: v.x,
-          y: v.y - signalLine[i].y,
-        }));
-
-        console.log(startIndex, fastEMA[0], slowEMA[0]);
-
-        return {
-          macdLine: macdLine.slice(signalPeriod - 1),
-          signalLine,
-          histogram,
-        };
       }
 
       function calculateBollingerBands(data, period = 20, multiplier = 2) {
@@ -478,45 +482,29 @@
 
       // Improved subplot layout management
       function updateSubplotLayout(indicatorType, plotDiv) {
-        const isRSI = indicatorType === "rsi";
-        const layout = plotDiv.layout || {};
-
-        // Count how many subplot indicators are currently visible
         const hasRSI = plotDiv.data.some((t) => t.yaxis === "y2");
-        const hasMACD = plotDiv.data.some((t) => t.yaxis === "y3");
 
         const update = {
           grid: {
-            rows: hasRSI && hasMACD ? 3 : 2,
+            rows: hasRSI ? 3 : 2,
             cols: 1,
             pattern: "independent",
             roworder: "top to bottom",
           },
+          xaxis: {
+            rangeslider: {
+              visible: true, // Keep this true
+              thickness: 0.1,
+              bgcolor: "rgba(255,255,255,0.1)",
+            },
+            type: "date", // Ensure type remains date
+          },
         };
 
-        // Main chart domain
-        if (hasRSI || hasMACD) {
-          update["yaxis.domain"] = [0.3, 1];
-        }
-
-        // RSI subplot
         if (hasRSI) {
-          update["yaxis2.domain"] = hasMACD ? [0.15, 0.28] : [0, 0.25];
+          update["yaxis.domain"] = [0.3, 1];
+          update["yaxis2.domain"] = [0, 0.25];
           update["yaxis2.title"] = "RSI";
-          update["xaxis2"] = {
-            matches: "x",
-            showticklabels: !hasMACD,
-          };
-        }
-
-        // MACD subplot
-        if (hasMACD) {
-          update["yaxis3.domain"] = [0, 0.12];
-          update["yaxis3.title"] = "MACD";
-          update["xaxis3"] = {
-            matches: "x",
-            showticklabels: true,
-          };
         }
 
         Plotly.relayout("my-plot-id", update);
@@ -561,15 +549,12 @@
               update["yaxis.domain"] = [0, 1];
             }
 
-            Plotly.relayout("my-plot-id", update);
+            // Plotly.relayout("my-plot-id", update);
           }
         } else {
           Plotly.addTraces("my-plot-id", traceConfig);
           if (subplotYAxis !== "y") {
-            updateSubplotLayout(
-              traceConfig.name.toLowerCase().includes("rsi") ? "rsi" : "macd",
-              plotDiv
-            );
+            updateSubplotLayout("rsi", plotDiv);
           }
         }
       }
@@ -676,42 +661,6 @@
             });
             subplotYAxis = "y2";
             break;
-
-          case "macd":
-            const { macdLine, signalLine, histogram } =
-              calculateMACD(dataPoints);
-            if (!macdLine.length) return;
-
-            traceConfigs.push(
-              {
-                x: macdLine.map((d) => d.x),
-                y: macdLine.map((d) => d.y),
-                type: "scatter",
-                mode: "lines",
-                name: "MACD Line",
-                line: { color: INDICATOR_COLORS.macdLine, width: 1.5 },
-                yaxis: "y3",
-              },
-              {
-                x: signalLine.map((d) => d.x),
-                y: signalLine.map((d) => d.y),
-                type: "scatter",
-                mode: "lines",
-                name: "Signal Line",
-                line: { color: INDICATOR_COLORS.signalLine, width: 1.5 },
-                yaxis: "y3",
-              },
-              {
-                x: histogram.map((d) => d.x),
-                y: histogram.map((d) => d.y),
-                type: "bar",
-                name: "MACD Histogram",
-                marker: { color: INDICATOR_COLORS.histogram },
-                yaxis: "y3",
-              }
-            );
-            subplotYAxis = "y3";
-            break;
         }
 
         traceConfigs.forEach((config) => {
@@ -748,9 +697,6 @@
           "yaxis.title": "Price",
           "xaxis.title": "Date",
         });
-
-        // Add visual feedback
-        // animateScaleChange();
       }
 
       function animateScaleChange() {
