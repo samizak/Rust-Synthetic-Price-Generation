@@ -22,7 +22,7 @@ fn generate_gbm(start_price: f64, mu: f64, sigma: f64, n_periods: usize) -> Vec<
     prices
 }
 
-fn test(sigma: f64, n_steps: usize) -> Vec<f64> {
+fn get_normal_distribution(sigma: f64, n_steps: usize) -> Vec<f64> {
     let mut rng = rand::rng();
     let normal = Normal::new(0.0, sigma / (n_steps as f64).sqrt()).unwrap();
     (0..n_steps - 1).map(|_| normal.sample(&mut rng)).collect()
@@ -38,7 +38,7 @@ fn generate_intra_prices(
         return vec![open_price, close_price];
     }
 
-    let returns = test(sigma, n_steps);
+    let returns = get_normal_distribution(sigma, n_steps);
     let mut prices = vec![open_price];
     let mut current_price = open_price;
 
