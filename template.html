@@ -16,6 +16,7 @@
         --gradient-end: #9333ea;
         --border-radius: 20px;
         --gap: 2rem;
+        --rsi-color: #ffa500;
       }
 
       @media (prefers-color-scheme: dark) {
@@ -40,11 +41,13 @@
         color: var(--text-color);
         line-height: 1.6;
         min-height: 100vh;
-        padding: 2rem;
+        padding: 1rem; /* Reduced from 2rem */
+        overflow-x: hidden; /* Prevent horizontal scroll */
       }
 
       .container {
-        max-width: 1600px;
+        max-width: 100%; /* Changed from 1600px */
+        padding: 0 1rem; /* Add horizontal padding */
         margin: 0 auto;
         display: flex;
         flex-direction: column;
@@ -52,10 +55,11 @@
       }
 
       .header {
+        width: 100%;
         display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 1.5rem;
+        justify-content: center;
+        padding: 20px 0;
+        background: #f0f0f0;
         background: var(--card-background);
         border-radius: var(--border-radius);
         backdrop-filter: blur(10px);
@@ -63,6 +67,14 @@
         position: sticky;
         top: 2rem;
         z-index: 100;
+        padding: 1.5rem;
+      }
+
+      .header-content {
+        display: flex;
+        width: 80%;
+        justify-content: space-between;
+        align-items: center;
       }
 
       .header h1 {
@@ -79,6 +91,19 @@
         letter-spacing: -0.025em;
       }
 
+      .button-group {
+        display: flex;
+        gap: 20px;
+      }
+
+      .button svg {
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+
+      .button.active svg {
+        transform: rotate(180deg);
+      }
+
       .chart-container {
         width: 100%;
         height: 75vh;
@@ -87,22 +112,17 @@
         border-radius: var(--border-radius);
         backdrop-filter: blur(10px);
         box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-        padding: 2rem;
-        position: relative;
         overflow: hidden;
         border: 1px solid rgba(255, 255, 255, 0.1);
+        margin: 0 auto;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        padding: 1.5rem;
       }
 
-      .chart-container::before {
-        content: "";
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(
-          160deg,
-          rgba(var(--gradient-start), 0.1),
-          rgba(var(--gradient-end), 0.05)
-        );
-        pointer-events: none;
+      .plot-container {
+        margin: 0 auto;
       }
 
       .button {
@@ -159,30 +179,6 @@
         opacity: 1;
       }
 
-      @media (max-width: 768px) {
-        body {
-          padding: 1rem;
-        }
-
-        .header {
-          flex-direction: column;
-          gap: 1rem;
-          align-items: stretch;
-          padding: 1.5rem;
-        }
-
-        .chart-container {
-          height: 70vh;
-          padding: 1rem;
-          border-radius: calc(var(--border-radius) / 1.5);
-        }
-
-        .button {
-          width: 100%;
-          justify-content: center;
-        }
-      }
-
       /* Custom scrollbar */
       ::-webkit-scrollbar {
         width: 8px;
@@ -200,10 +196,10 @@
       /* Add these new styles */
       .indicator-menu {
         position: relative;
-        display: inline-block;
+        /* display: inline-block; */
         display: flex;
         flex-direction: row;
-        /* gap: 10px; */
+        gap: 1rem;
         padding: 5px;
       }
 
@@ -255,57 +251,67 @@
   <body>
     <div class="container">
       <header class="header">
-        <h1>📈 Analytics Dashboard</h1>
-        <div class="button-group">
-          <div class="indicator-menu">
-            <button class="button" onclick="toggleIndicatorMenu()">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+        <div class="header-content">
+          <h1>📈 Analytics Dashboard</h1>
+          <div class="button-group">
+            <div class="indicator-menu">
+              <button
+                class="button"
+                onclick="toggleIndicatorMenu()"
+                id="indicatorButton"
               >
-                <path d="M6 9l6 6 6-6" />
-              </svg>
-              <span>Add Indicator</span>
-            </button>
-            <button class="button" id="logScaleBtn" onclick="toggleLogScale()">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+                <span>Add Indicator</span>
+              </button>
+              <button
+                class="button"
+                id="logScaleBtn"
+                onclick="toggleLogScale()"
               >
-                <path d="M3 3v18h18" />
-                <path d="M18 17V9" />
-                <path d="M13 17V5" />
-                <path d="M8 17v-3" />
-              </svg>
-              <span>Log Scale</span>
-            </button>
-            <div class="indicator-dropdown" id="indicatorDropdown">
-              <div class="indicator-item" onclick="addIndicator('sma')">
-                SMA (20)
-              </div>
-              <div class="indicator-item" onclick="addIndicator('ema')">
-                EMA (20)
-              </div>
-              <div class="indicator-item" onclick="addIndicator('rsi')">
-                RSI (14)
-              </div>
-              <div class="indicator-item" onclick="addIndicator('macd')">
-                MACD
-              </div>
-              <div class="indicator-item" onclick="addIndicator('bollinger')">
-                Bollinger Bands
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M3 3v18h18" />
+                  <path d="M18 17V9" />
+                  <path d="M13 17V5" />
+                  <path d="M8 17v-3" />
+                </svg>
+                <span>Log Scale</span>
+              </button>
+              <div class="indicator-dropdown" id="indicatorDropdown">
+                <div class="indicator-item" onclick="addIndicator('sma')">
+                  SMA (20)
+                </div>
+                <div class="indicator-item" onclick="addIndicator('ema')">
+                  EMA (20)
+                </div>
+                <div class="indicator-item" onclick="addIndicator('rsi')">
+                  RSI (14)
+                </div>
+                <div class="indicator-item" onclick="addIndicator('macd')">
+                  MACD
+                </div>
+                <div class="indicator-item" onclick="addIndicator('bollinger')">
+                  Bollinger Bands
+                </div>
               </div>
             </div>
           </div>
@@ -384,7 +390,10 @@
       // Indicator menu functions
       function toggleIndicatorMenu() {
         const dropdown = document.getElementById("indicatorDropdown");
+        const button = document.getElementById("indicatorButton");
+
         dropdown.classList.toggle("show");
+        button.classList.toggle("active");
       }
 
       // Close dropdown when clicking outside
@@ -392,15 +401,21 @@
         if (!event.target.closest(".indicator-menu")) {
           const dropdowns =
             document.getElementsByClassName("indicator-dropdown");
+          const buttons = document.querySelectorAll(
+            ".indicator-menu button.button"
+          );
+
           for (let i = 0; i < dropdowns.length; i++) {
             dropdowns[i].classList.remove("show");
           }
+
+          buttons.forEach((button) => button.classList.remove("active"));
         }
       };
 
       function addIndicator(type) {
-        const plot = document.getElementById("my-plot-id");
-        const mainTrace = plot.data.find(
+        const plotDiv = document.getElementById("my-plot-id");
+        const mainTrace = plotDiv.data.find(
           (t) => t.type === "scatter" || t.type === "candlestick"
         );
 
@@ -409,7 +424,6 @@
           return;
         }
 
-        // Extract closing prices for candlestick or y-values for line charts
         const yValues =
           mainTrace.type === "candlestick" ? mainTrace.close : mainTrace.y;
         const dataPoints = mainTrace.x.map((x, index) => ({
@@ -418,9 +432,64 @@
         }));
 
         let indicatorData, traceConfig;
-        const period = 20; // Default period
+        const period = type === "rsi" ? 14 : 20; // RSI uses 14 period by default
 
         switch (type) {
+          case "rsi":
+            indicatorData = calculateRSI(dataPoints, period);
+            traceConfig = {
+              x: indicatorData.map((d) => d.x),
+              y: indicatorData.map((d) => d.y),
+              type: "scatter",
+              mode: "lines",
+              name: `RSI (${period})`,
+              line: { color: "#FFA500", width: 1.5 },
+              yaxis: "y2",
+            };
+
+            // Check if subplot exists
+            const hasSubplot = plotDiv.layout && plotDiv.layout.grid;
+
+            if (!hasSubplot) {
+              // Create subplot layout
+              Plotly.relayout("my-plot-id", {
+                grid: { rows: 2, cols: 1, pattern: "independent" },
+                yaxis: { domain: [0.3, 1] }, // Main chart takes 70% height
+                yaxis2: {
+                  domain: [0, 0.25], // RSI takes 25% height
+                  title: "RSI",
+                  range: [0, 100],
+                  showgrid: true,
+                  gridcolor: "rgba(255,255,255,0.1)",
+                },
+                xaxis2: {
+                  anchor: "y2",
+                  matches: "x",
+                  showticklabels: true,
+                },
+              });
+            }
+
+            // Toggle RSI
+            const existingIndex = plotDiv.data.findIndex(
+              (t) => t.name === traceConfig.name
+            );
+            if (existingIndex !== -1) {
+              Plotly.deleteTraces("my-plot-id", existingIndex);
+              // Remove subplot if no other indicators
+              if (!plotDiv.data.some((t) => t.yaxis === "y2")) {
+                Plotly.relayout("my-plot-id", {
+                  grid: undefined,
+                  yaxis: { domain: [0, 1] },
+                  yaxis2: undefined,
+                  xaxis2: undefined,
+                });
+              }
+            } else {
+              Plotly.addTraces("my-plot-id", traceConfig);
+            }
+            break;
+
           case "sma":
             indicatorData = calculateSMA(dataPoints, period);
             traceConfig = {
@@ -432,6 +501,18 @@
               line: { color: "#FF6B6B", width: 1.5 },
               yaxis: "y",
             };
+            // Add explicit trace toggle for SMA
+            const existingSMA = plotDiv.data.findIndex(
+              (t) => t.name === traceConfig.name
+            );
+
+            console.log(existingSMA);
+
+            if (existingSMA !== -1) {
+              Plotly.deleteTraces("my-plot-id", existingSMA);
+            } else {
+              Plotly.addTraces("my-plot-id", traceConfig);
+            }
             break;
 
           case "ema":
@@ -444,9 +525,16 @@
               name: `EMA (${period})`,
               line: { color: "#4ECDC4", width: 1.5, dash: "dot" },
               yaxis: "y",
-            };
+            }; // Add explicit trace toggle for EMA
+            const existingEMA = plotDiv.data.findIndex(
+              (t) => t.name === traceConfig.name
+            );
+            if (existingEMA !== -1) {
+              Plotly.deleteTraces("my-plot-id", existingEMA);
+            } else {
+              Plotly.addTraces("my-plot-id", traceConfig);
+            }
             break;
-
           // Add other indicator cases here
 
           default:
@@ -455,7 +543,7 @@
         }
 
         // Remove existing trace if it exists
-        const existingTraces = plot.data
+        const existingTraces = plotDiv.data
           .map((t, i) => (t.name === traceConfig.name ? i : -1))
           .filter((i) => i !== -1);
 
@@ -491,12 +579,12 @@
         // Update plot
         Plotly.relayout("my-plot-id", {
           "yaxis.type": isLogScale ? "log" : "linear",
-          "yaxis.title": isLogScale ? "Logarithmic Scale" : "Linear Scale",
-          "xaxis.title": isLogScale ? "Data Points" : "Data Points",
+          "yaxis.title": "Price",
+          "xaxis.title": "Date",
         });
 
         // Add visual feedback
-        animateScaleChange();
+        // animateScaleChange();
       }
 
       function animateScaleChange() {
