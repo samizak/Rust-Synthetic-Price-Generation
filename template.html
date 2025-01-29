@@ -312,7 +312,7 @@
         </div>
       </header>
 
-      <div class="chart-container">
+      <div class="chart-container" id="my-plot-id">
         <!-- PLOT_PLACEHOLDER -->
       </div>
 
@@ -399,30 +399,71 @@
       };
 
       function addIndicator(type) {
-        const existingData = Plotly.d3.csv.parse(/* Your original data here */);
+        const plot = document.getElementById("my-plot-id");
+        const mainTrace = plot.data.find(
+          (t) => t.type === "scatter" || t.type === "candlestick"
+        );
 
-        // Example implementation for SMA
+        if (!mainTrace) {
+          console.error("Main price trace not found");
+          return;
+        }
+
+        // Extract closing prices for candlestick or y-values for line charts
+        const yValues =
+          mainTrace.type === "candlestick" ? mainTrace.close : mainTrace.y;
+        const dataPoints = mainTrace.x.map((x, index) => ({
+          x,
+          y: yValues[index],
+        }));
+
+        let indicatorData, traceConfig;
+        const period = 20; // Default period
+
         switch (type) {
           case "sma":
-            const smaData = calculateSMA(existingData);
-            Plotly.addTraces("my-plot-id", {
-              x: smaData.map((d) => d.x),
-              y: smaData.map((d) => d.y),
+            indicatorData = calculateSMA(dataPoints, period);
+            traceConfig = {
+              x: indicatorData.map((d) => d.x),
+              y: indicatorData.map((d) => d.y),
               type: "scatter",
               mode: "lines",
-              name: "SMA (20)",
-              line: { color: "#00FF00" },
-            });
+              name: `SMA (${period})`,
+              line: { color: "#FF6B6B", width: 1.5 },
+              yaxis: "y",
+            };
             break;
 
           case "ema":
-            // Similar implementation for EMA
+            indicatorData = calculateEMA(dataPoints, period);
+            traceConfig = {
+              x: indicatorData.map((d) => d.x),
+              y: indicatorData.map((d) => d.y),
+              type: "scatter",
+              mode: "lines",
+              name: `EMA (${period})`,
+              line: { color: "#4ECDC4", width: 1.5, dash: "dot" },
+              yaxis: "y",
+            };
             break;
 
-          // Add cases for other indicators
+          // Add other indicator cases here
+
+          default:
+            console.warn("Unknown indicator type:", type);
+            return;
         }
 
-        // Close dropdown
+        // Remove existing trace if it exists
+        const existingTraces = plot.data
+          .map((t, i) => (t.name === traceConfig.name ? i : -1))
+          .filter((i) => i !== -1);
+
+        if (existingTraces.length > 0) {
+          Plotly.deleteTraces("my-plot-id", existingTraces);
+        }
+
+        Plotly.addTraces("my-plot-id", traceConfig);
         document.getElementById("indicatorDropdown").classList.remove("show");
       }
 
