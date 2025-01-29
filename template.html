@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Synthetic Prices</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+      :root {
+        --primary-color: #3b82f6;
+        --secondary-color: #6366f1;
+        --background-color: #f8fafc;
+        --card-background: rgba(255, 255, 255, 0.9);
+        --text-color: #1e293b;
+        --gradient-start: #4f46e5;
+        --gradient-end: #9333ea;
+        --border-radius: 20px;
+        --gap: 2rem;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background-color: #0f172a;
+          --card-background: rgba(30, 41, 59, 0.9);
+          --text-color: #f8fafc;
+          --gradient-start: #818cf8;
+          --gradient-end: #c084fc;
+        }
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", system-ui, sans-serif;
+        background-color: var(--background-color);
+        color: var(--text-color);
+        line-height: 1.6;
+        min-height: 100vh;
+        padding: 2rem;
+      }
+
+      .container {
+        max-width: 1600px;
+        margin: 0 auto;
+        display: flex;
+        flex-direction: column;
+        gap: var(--gap);
+      }
+
+      .header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 1.5rem;
+        background: var(--card-background);
+        border-radius: var(--border-radius);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        position: sticky;
+        top: 2rem;
+        z-index: 100;
+      }
+
+      .header h1 {
+        font-size: 1.75rem;
+        background: linear-gradient(
+          45deg,
+          var(--gradient-start),
+          var(--gradient-end)
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
+        font-weight: 700;
+        letter-spacing: -0.025em;
+      }
+
+      .chart-container {
+        width: 100%;
+        height: 75vh;
+        min-height: 600px;
+        background: var(--card-background);
+        border-radius: var(--border-radius);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        padding: 2rem;
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+      }
+
+      .chart-container::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          160deg,
+          rgba(var(--gradient-start), 0.1),
+          rgba(var(--gradient-end), 0.05)
+        );
+        pointer-events: none;
+      }
+
+      .button {
+        background: linear-gradient(
+          45deg,
+          var(--gradient-start),
+          var(--gradient-end)
+        );
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: calc(var(--border-radius) / 2);
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        position: relative;
+        overflow: hidden;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+
+      .button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 15px rgba(var(--gradient-start), 0.3);
+      }
+
+      .button:active {
+        transform: translateY(0);
+      }
+
+      .button svg {
+        transition: transform 0.3s ease;
+      }
+
+      .button.active {
+        background: var(--card-background);
+        color: var(--text-color);
+        box-shadow: inset 0 0 0 2px var(--primary-color);
+      }
+
+      footer {
+        text-align: center;
+        margin-top: auto;
+        padding: 2rem;
+        color: rgba(148, 163, 184, 0.8);
+        font-size: 0.875rem;
+        opacity: 0.8;
+        transition: opacity 0.3s ease;
+      }
+
+      footer:hover {
+        opacity: 1;
+      }
+
+      @media (max-width: 768px) {
+        body {
+          padding: 1rem;
+        }
+
+        .header {
+          flex-direction: column;
+          gap: 1rem;
+          align-items: stretch;
+          padding: 1.5rem;
+        }
+
+        .chart-container {
+          height: 70vh;
+          padding: 1rem;
+          border-radius: calc(var(--border-radius) / 1.5);
+        }
+
+        .button {
+          width: 100%;
+          justify-content: center;
+        }
+      }
+
+      /* Custom scrollbar */
+      ::-webkit-scrollbar {
+        width: 8px;
+      }
+
+      ::-webkit-scrollbar-track {
+        background: rgba(0, 0, 0, 0.1);
+      }
+
+      ::-webkit-scrollbar-thumb {
+        background: var(--primary-color);
+        border-radius: 4px;
+      }
+
+      /* Add these new styles */
+      .indicator-menu {
+        position: relative;
+        display: inline-block;
+        display: flex;
+        flex-direction: row;
+        /* gap: 10px; */
+        padding: 5px;
+      }
+
+      .indicator-dropdown {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        background: var(--card-background);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+        padding: 1rem;
+        min-width: 200px;
+        z-index: 1000;
+        margin-top: 0.5rem;
+        backdrop-filter: blur(10px);
+      }
+
+      .indicator-dropdown.show {
+        display: block;
+        animation: slideIn 0.3s ease;
+      }
+
+      .indicator-item {
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        margin: 0.25rem 0;
+      }
+
+      .indicator-item:hover {
+        background: rgba(var(--gradient-start), 0.1);
+        transform: translateX(4px);
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(-10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <header class="header">
+        <h1>📈 Analytics Dashboard</h1>
+        <div class="button-group">
+          <div class="indicator-menu">
+            <button class="button" onclick="toggleIndicatorMenu()">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+              <span>Add Indicator</span>
+            </button>
+            <button class="button" id="logScaleBtn" onclick="toggleLogScale()">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path d="M3 3v18h18" />
+                <path d="M18 17V9" />
+                <path d="M13 17V5" />
+                <path d="M8 17v-3" />
+              </svg>
+              <span>Log Scale</span>
+            </button>
+            <div class="indicator-dropdown" id="indicatorDropdown">
+              <div class="indicator-item" onclick="addIndicator('sma')">
+                SMA (20)
+              </div>
+              <div class="indicator-item" onclick="addIndicator('ema')">
+                EMA (20)
+              </div>
+              <div class="indicator-item" onclick="addIndicator('rsi')">
+                RSI (14)
+              </div>
+              <div class="indicator-item" onclick="addIndicator('macd')">
+                MACD
+              </div>
+              <div class="indicator-item" onclick="addIndicator('bollinger')">
+                Bollinger Bands
+              </div>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div class="chart-container">
+        <!-- PLOT_PLACEHOLDER -->
+      </div>
+
+      <footer>
+        <p>
+          Powered by Rust + Plotly • Generated at <span id="timestamp"></span>
+        </p>
+        <p style="margin-top: 0.5rem; opacity: 0.7">
+          Toggle scale type for detailed analysis
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      // Technical indicator functions
+      function calculateSMA(data, period = 20) {
+        const sma = [];
+        for (let i = period - 1; i < data.length; i++) {
+          const sum = data
+            .slice(i - period + 1, i + 1)
+            .reduce((a, b) => a + b.y, 0);
+          sma.push({ x: data[i].x, y: sum / period });
+        }
+        return sma;
+      }
+
+      function calculateEMA(data, period = 20) {
+        const ema = [];
+        const multiplier = 2 / (period + 1);
+        let emaValue =
+          data.slice(0, period).reduce((a, b) => a + b.y, 0) / period;
+
+        for (let i = period; i < data.length; i++) {
+          emaValue = (data[i].y - emaValue) * multiplier + emaValue;
+          ema.push({ x: data[i].x, y: emaValue });
+        }
+        return ema;
+      }
+
+      function calculateRSI(data, period = 14) {
+        const rsi = [];
+        let gains = [];
+        let losses = [];
+
+        // Initial calculation
+        for (let i = 1; i <= period; i++) {
+          const diff = data[i].y - data[i - 1].y;
+          gains.push(Math.max(diff, 0));
+          losses.push(Math.max(-diff, 0));
+        }
+
+        let avgGain = gains.reduce((a, b) => a + b, 0) / period;
+        let avgLoss = losses.reduce((a, b) => a + b, 0) / period;
+
+        for (let i = period + 1; i < data.length; i++) {
+          const diff = data[i].y - data[i - 1].y;
+          const gain = Math.max(diff, 0);
+          const loss = Math.max(-diff, 0);
+
+          avgGain = (avgGain * (period - 1) + gain) / period;
+          avgLoss = (avgLoss * (period - 1) + loss) / period;
+
+          const rs = avgGain / avgLoss;
+          rsi.push({ x: data[i].x, y: 100 - 100 / (1 + rs) });
+        }
+        return rsi;
+      }
+
+      // Indicator menu functions
+      function toggleIndicatorMenu() {
+        const dropdown = document.getElementById("indicatorDropdown");
+        dropdown.classList.toggle("show");
+      }
+
+      // Close dropdown when clicking outside
+      window.onclick = function (event) {
+        if (!event.target.closest(".indicator-menu")) {
+          const dropdowns =
+            document.getElementsByClassName("indicator-dropdown");
+          for (let i = 0; i < dropdowns.length; i++) {
+            dropdowns[i].classList.remove("show");
+          }
+        }
+      };
+
+      function addIndicator(type) {
+        const existingData = Plotly.d3.csv.parse(/* Your original data here */);
+
+        // Example implementation for SMA
+        switch (type) {
+          case "sma":
+            const smaData = calculateSMA(existingData);
+            Plotly.addTraces("my-plot-id", {
+              x: smaData.map((d) => d.x),
+              y: smaData.map((d) => d.y),
+              type: "scatter",
+              mode: "lines",
+              name: "SMA (20)",
+              line: { color: "#00FF00" },
+            });
+            break;
+
+          case "ema":
+            // Similar implementation for EMA
+            break;
+
+          // Add cases for other indicators
+        }
+
+        // Close dropdown
+        document.getElementById("indicatorDropdown").classList.remove("show");
+      }
+
+      // Add generation timestamp
+      document.getElementById("timestamp").textContent =
+        new Date().toLocaleString();
+
+      let isLogScale = false;
+
+      function toggleLogScale() {
+        const btn = document.getElementById("logScaleBtn");
+        isLogScale = !isLogScale;
+
+        // Update button state
+        btn.classList.toggle("active", isLogScale);
+        btn.querySelector("span").textContent = isLogScale
+          ? "Linear Scale"
+          : "Log Scale";
+
+        // Animate icon
+        btn.querySelector("svg").style.transform = `rotate(${
+          isLogScale ? "180deg" : "0deg"
+        })`;
+
+        // Update plot
+        Plotly.relayout("my-plot-id", {
+          "yaxis.type": isLogScale ? "log" : "linear",
+          "yaxis.title": isLogScale ? "Logarithmic Scale" : "Linear Scale",
+          "xaxis.title": isLogScale ? "Data Points" : "Data Points",
+        });
+
+        // Add visual feedback
+        animateScaleChange();
+      }
+
+      function animateScaleChange() {
+        const plot = document.getElementById("my-plot-id");
+        if (plot) {
+          plot.style.opacity = "0.8";
+          plot.style.transform = "scale(0.98)";
+          setTimeout(() => {
+            plot.style.opacity = "1";
+            plot.style.transform = "scale(1)";
+          }, 200);
+        }
+      }
+    </script>
+  </body>
+</html>
