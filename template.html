@@ -434,6 +434,57 @@
         let indicatorData, traceConfig;
         const period = type === "rsi" ? 14 : 20; // RSI uses 14 period by default
 
+        // Add these new indicator calculation functions
+        function calculateMACD(
+          data,
+          fastPeriod = 12,
+          slowPeriod = 26,
+          signalPeriod = 9
+        ) {
+          const fastEMA = calculateEMA(data, fastPeriod);
+          const slowEMA = calculateEMA(data, slowPeriod);
+
+          // Align the EMA arrays
+          const macdLine = fastEMA
+            .slice(slowPeriod - fastPeriod)
+            .map((v, i) => ({
+              x: v.x,
+              y: v.y - slowEMA[i].y,
+            }));
+
+          const signalLine = calculateEMA(macdLine, signalPeriod);
+
+          const histogram = macdLine.slice(signalPeriod - 1).map((v, i) => ({
+            x: v.x,
+            y: v.y - signalLine[i].y,
+          }));
+
+          return { macdLine, signalLine, histogram };
+        }
+
+        function calculateBollingerBands(data, period = 20, multiplier = 2) {
+          const sma = calculateSMA(data, period);
+          const bands = [];
+
+          for (let i = period - 1; i < data.length; i++) {
+            const slice = data.slice(i - period + 1, i + 1);
+            const mean = sma[i - period + 1].y;
+            const stdDev = Math.sqrt(
+              slice.reduce((sum, d) => sum + Math.pow(d.y - mean, 2), 0) /
+                period
+            );
+
+            bands.push({
+              x: data[i].x,
+              upper: mean + multiplier * stdDev,
+              lower: mean - multiplier * stdDev,
+              sma: mean,
+            });
+          }
+
+          return bands;
+        }
+
         switch (type) {
           case "rsi":
             indicatorData = calculateRSI(dataPoints, period);
@@ -535,6 +586,154 @@
               Plotly.addTraces("my-plot-id", traceConfig);
             }
             break;
+
+          case "macd":
+            const { macdLine, signalLine, histogram } =
+              calculateMACD(dataPoints);
+
+            // MACD Line
+            let macdTrace = {
+              x: macdLine.map((d) => d.x),
+              y: macdLine.map((d) => d.y),
+              type: "scatter",
+              mode: "lines",
+              name: "MACD Line",
+              line: { color: "#26a69a", width: 1.5 },
+              yaxis: "y3",
+            };
+
+            // Signal Line
+            let signalTrace = {
+              x: signalLine.map((d) => d.x),
+              y: signalLine.map((d) => d.y),
+              type: "scatter",
+              mode: "lines",
+              name: "Signal Line",
+              line: { color: "#ff6d00", width: 1.5 },
+              yaxis: "y3",
+            };
+
+            // Histogram
+            let histTrace = {
+              x: histogram.map((d) => d.x),
+              y: histogram.map((d) => d.y),
+              type: "bar",
+              name: "MACD Histogram",
+              marker: { color: "#7e57c2" },
+              yaxis: "y3",
+            };
+
+            // Check for existing MACD traces
+            const existingMACD = plotDiv.data.findIndex(
+              (t) => t.name === "MACD Line"
+            );
+
+            if (existingMACD !== -1) {
+              Plotly.deleteTraces("my-plot-id", [
+                existingMACD,
+                existingMACD + 1,
+                existingMACD + 2,
+              ]);
+              // Remove subplot if no other indicators
+              if (!plotDiv.data.some((t) => t.yaxis === "y3")) {
+                Plotly.relayout("my-plot-id", {
+                  grid: undefined,
+                  yaxis3: undefined,
+                  xaxis3: undefined,
+                });
+              }
+            } else {
+              // Create subplot layout
+              Plotly.relayout("my-plot-id", {
+                grid: { rows: 3, cols: 1, pattern: "independent" },
+                yaxis: { domain: [0.5, 1] }, // Main chart
+                yaxis2: { domain: [0.25, 0.45] }, // RSI
+                yaxis3: { domain: [0, 0.2] }, // MACD
+                xaxis3: {
+                  anchor: "y3",
+                  matches: "x",
+                  showticklabels: true,
+                },
+              });
+
+              Plotly.addTraces("my-plot-id", [
+                macdTrace,
+                signalTrace,
+                histTrace,
+              ]);
+            }
+            break;
+
+          case "bollinger":
+            const bbData = calculateBollingerBands(dataPoints);
+
+            // Upper Band
+            let upperTrace = {
+              x: bbData.map((d) => d.x),
+              y: bbData.map((d) => d.upper),
+              type: "scatter",
+              mode: "lines",
+              name: "Bollinger Upper",
+              line: { color: "#26a69a", width: 1, dash: "dot" },
+              yaxis: "y",
+            };
+
+            // Lower Band
+            let lowerTrace = {
+              x: bbData.map((d) => d.x),
+              y: bbData.map((d) => d.lower),
+              type: "scatter",
+              mode: "lines",
+              name: "Bollinger Lower",
+              line: { color: "#ef5350", width: 1, dash: "dot" },
+              yaxis: "y",
+            };
+
+            // SMA Line
+            let smaTrace = {
+              x: bbData.map((d) => d.x),
+              y: bbData.map((d) => d.sma),
+              type: "scatter",
+              mode: "lines",
+              name: "Bollinger SMA",
+              line: { color: "#787b86", width: 1 },
+              yaxis: "y",
+            };
+
+            // Fill between bands
+            let fillTrace = {
+              x: bbData.map((d) => d.x),
+              y: bbData.map((d) => d.upper),
+              type: "scatter",
+              mode: "none",
+              name: "Bollinger Band",
+              fill: "tonexty",
+              fillcolor: "rgba(120, 123, 134, 0.1)",
+              yaxis: "y",
+            };
+
+            // Check existing Bollinger traces
+            const existingBB = plotDiv.data.findIndex(
+              (t) => t.name === "Bollinger Upper"
+            );
+
+            if (existingBB !== -1) {
+              Plotly.deleteTraces("my-plot-id", [
+                existingBB,
+                existingBB + 1,
+                existingBB + 2,
+                existingBB + 3,
+              ]);
+            } else {
+              Plotly.addTraces("my-plot-id", [
+                upperTrace,
+                lowerTrace,
+                smaTrace,
+                fillTrace,
+              ]);
+            }
+            break;
+
           // Add other indicator cases here
 
           default:
@@ -542,16 +741,7 @@
             return;
         }
 
-        // Remove existing trace if it exists
-        const existingTraces = plotDiv.data
-          .map((t, i) => (t.name === traceConfig.name ? i : -1))
-          .filter((i) => i !== -1);
-
-        if (existingTraces.length > 0) {
-          Plotly.deleteTraces("my-plot-id", existingTraces);
-        }
-
-        Plotly.addTraces("my-plot-id", traceConfig);
+        // Plotly.addTraces("my-plot-id", traceConfig);
         document.getElementById("indicatorDropdown").classList.remove("show");
       }
 
