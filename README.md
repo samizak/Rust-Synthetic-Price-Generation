@@ -1,4 +1,10 @@
 # Rust Synthetic Price Generator
+<div align="center">
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE-MIT)
+[![Built with Rust](https://img.shields.io/badge/Built_with-Rust-orange.svg)](https://www.rust-lang.org/)
+</div>
+
 This Rust project generates synthetic financial market data (OHLC format) using Geometric Brownian Motion (GBM) and visualizes it as an interactive candlestick chart using Plotly.
 
 ![analytics](https://github.com/user-attachments/assets/357e434e-8175-47f7-b79e-20efe107aaf8)
@@ -46,3 +52,7 @@ cargo run
 ```
 
 After running the program, open `output.html` to see an interactive candlestick chart showing the generated synthetic prices.
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
